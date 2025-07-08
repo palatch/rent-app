@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>คำนวณสัญญาเช่า/อากรสแตมป์</title>
+  <style>
+    body { font-family: 'Sarabun', sans-serif; margin: 0; padding: 0; background: #e6f0fa; }
+    .container { max-width: 480px; margin: 16px auto; background: #fff; border-radius: 14px; padding: 24px; box-shadow: 0 2px 12px #0001; }
+    h2 { text-align: center; color: #138fdc; margin-bottom: 20px;}
+    label { display: block; margin-top: 12px; margin-bottom: 4px; font-weight: bold;}
+    input, select { width: 100%; padding: 8px; border: 1px solid #b0c4de; border-radius: 6px; font-size: 1em; }
+    .rent-steps { margin-bottom: 8px;}
+    button { margin: 10px 0; background: #138fdc; color: #fff; border: none; padding: 8px 16px; border-radius: 6px; font-size: 1em; cursor: pointer;}
+    .result-table { margin-top: 18px; width: 100%; border-collapse: collapse;}
+    .result-table th, .result-table td { padding: 8px; border-bottom: 1px solid #d0e6fb; text-align: center;}
+    .result-table th { background: #e3f1fa;}
+    @media (max-width: 520px) { .container { max-width: 98vw; padding: 12px;}}
+    .step-row { display: flex; gap: 6px; margin-bottom: 4px;}
+    .step-row input { flex: 1 1 60%; }
+    .step-row label { flex: 0 0 40px; font-weight: normal;}
+    .flex {display: flex; gap: 8px;}
+    .mt8 {margin-top: 8px;}
+    .mt16 {margin-top: 16px;}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>โปรแกรมคำนวณสัญญาเช่า/อากรสแตมป์</h2>
+
+    <label>จำนวนปีที่เช่า (ปี)</label>
+    <input id="years" type="number" min="0" placeholder="เช่น 3" oninput="calc()">
+
+    <label>จำนวนเดือนที่เช่า (เดือน)</label>
+    <input id="months" type="number" readonly>
+
+    <label>วันที่เริ่มสัญญา</label>
+    <input id="startDate" type="date" oninput="calc()">
+
+    <label>วันที่สิ้นสุดสัญญา (คำนวณให้)</label>
+    <input id="endDate" type="date" readonly>
+
+    <label>ขนาดพื้นที่ (ตร.ม.)</label>
+    <input id="area" type="number" min="0" placeholder="เช่น 100" oninput="calc()">
+
+    <label>ค่าเช่าต่อตร.ม./เดือน (ใส่แต่ละปี)</label>
+    <div id="rentSteps"></div>
+    <button type="button" onclick="addStep()">+ เพิ่มปีถัดไป</button>
+    <button type="button" onclick="removeStep()" style="background:#aaa;">- ลบปีสุดท้าย</button>
+
+    <div class="mt16">
+      <table class="result-table">
+        <tr>
+          <th>ปีที่</th>
+          <th>ค่าเช่าต่อเดือน</th>
+          <th>90% ค่าเช่า</th>
+          <th>10% ค่าบริการ</th>
+        </tr>
+        <tbody id="rentResult"></tbody>
+      </table>
+    </div>
+    <div class="mt8">
+      <label>มูลค่าอากรสแตมป์ (บาท)</label>
+      <input id="stamp" type="text" readonly>
+    </div>
+  </div>
+
+<script>
+let stepCount = 1;
+
+function addStep() {
+  stepCount++;
+  renderSteps();
+  calc();
+}
+function removeStep() {
+  if(stepCount > 1) {
+    stepCount--;
+    renderSteps();
+    calc();
+  }
+}
+function renderSteps() {
+  const rentSteps = document.getElementById('rentSteps');
+  rentSteps.innerHTML = '';
+  for(let i=0; i<stepCount; i++) {
+    rentSteps.innerHTML += `
+      <div class="step-row">
+        <label>ปีที่ ${i+1}</label>
+        <input type="number" min="0" placeholder="บาท/ตร.ม." id="step${i}" oninput="calc()">
+      </div>
+    `;
+  }
+}
+renderSteps();
+
+function calc() {
+  // จำนวนปี
+  let years = parseInt(document.getElementById('years').value) || 0;
+  let months = years * 12;
+  document.getElementById('months').value = months;
+
+  // วันที่
+  let start = document.getElementById('startDate').value;
+  let endInput = document.getElementById('endDate');
+  if(start && years) {
+    let s = new Date(start);
+    s.setFullYear(s.getFullYear() + years);
+    s.setDate(s.getDate() - 1); // วันสุดท้ายก่อนครบปี
+    endInput.value = s.toISOString().slice(0,10);
+  } else {
+    endInput.value = '';
+  }
+
+  // ขนาด
+  let area = parseFloat(document.getElementById('area').value) || 0;
+
+  // ค่าเช่าต่อปี (step)
+  let rents = [];
+  for(let i=0; i<stepCount; i++) {
+    let val = parseFloat(document.getElementById('step'+i).value) || 0;
+    rents.push(val);
+  }
+
+  // แสดงผล
+  let rentResult = '';
+  let totalRent90 = 0; // รวม 90% ค่าเช่าใช้คำนวณอากร
+  for(let i=0; i<years; i++) {
+    let rentPerSqm = rents[i] || 0;
+    let rentPerMonth = rentPerSqm * area;
+    let rent90 = rentPerMonth * 0.9;
+    let rent10 = rentPerMonth * 0.1;
+    rentResult += `<tr>
+      <td>ปีที่ ${i+1}</td>
+      <td>${rentPerMonth.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
+      <td>${rent90.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
+      <td>${rent10.toLocaleString(undefined, {maximumFractionDigits:2})}</td>
+    </tr>`;
+    totalRent90 += rent90 * 12;
+  }
+  document.getElementById('rentResult').innerHTML = rentResult;
+
+  // อากรสแตมป์
+  // มูลค่าอากร = (90% ของค่าเช่าต่อเดือน) * จำนวนเดือน / 1000
+  let stamp = (totalRent90 / 1000).toFixed(2);
+  document.getElementById('stamp').value = isNaN(stamp) ? '' : stamp;
+}
+</script>
+</body>
+</html>
